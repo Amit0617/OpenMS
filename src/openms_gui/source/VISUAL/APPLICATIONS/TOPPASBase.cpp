@@ -99,6 +99,8 @@
 #include <QtWidgets/QWhatsThis>
 #include <QtWidgets/QMdiSubWindow>
 
+//STL
+#include <algorithm>
 
 using namespace std;
 using namespace OpenMS;
