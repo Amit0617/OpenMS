@@ -39,8 +39,6 @@
 
 #include <vector>
 
-#include <vector>
-
 namespace OpenMS
 {
 
