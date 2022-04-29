@@ -488,7 +488,8 @@ namespace OpenMS
     }
 
     QStringList category_list = category_set.values();
-    std::sort(category_list.begin(), category_list.end(), std::less<QString>());
+
+    std::sort(category_list.begin(), category_list.end());
 
     std::map<QString, QTreeWidgetItem*> category_map;
 
