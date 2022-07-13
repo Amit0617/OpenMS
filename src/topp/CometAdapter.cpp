@@ -47,6 +47,7 @@
 #include <OpenMS/CHEMISTRY/ResidueModification.h>
 #include <OpenMS/SYSTEM/File.h>
 
+#include <unordered_set>
 #include <fstream>
 
 #include <QStringList>
@@ -279,8 +280,12 @@ protected:
       {
         continue;
       }
+
       modifications.push_back(ModificationsDB::getInstance()->getModification(modification));
     }
+
+    // sort modifications
+    std::sort(modifications.begin(), modifications.end());
 
     return modifications;
   }
@@ -358,6 +363,29 @@ protected:
     {
       const ResidueModification* mod = variable_modifications[var_mod_index];
       double mass = mod->getDiffMonoMass();
+
+      // count duplicate modifications
+      map<const ResidueModification*, int> duplicate;
+      for(auto i = variable_modifications.begin() + 1; i != variable_modifications.end(); ++i)
+      {
+        if(*i == *(i - 1))
+        {
+          duplicate[*i]++;
+        }
+      }
+
+      // getting aa of only duplicate modifications into one modification
+      for(const auto& i : duplicate)
+      {
+          for(int j = 0; j <= i.second; j++)
+          {
+              StringList residues;
+              String residue = i.first->getOrigin();
+              residues.push_back(residue);
+          }
+      }
+
+      // AAs without any duplicate modifications
       String residues = mod->getOrigin();
 
       // support for binary groups, e.g. for SILAC
