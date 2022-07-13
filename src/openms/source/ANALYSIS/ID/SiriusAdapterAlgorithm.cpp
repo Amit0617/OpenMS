@@ -2,7 +2,7 @@
 //                   OpenMS -- Open-Source Mass Spectrometry
 // --------------------------------------------------------------------------
 // Copyright The OpenMS Team -- Eberhard Karls University Tuebingen,
-// ETH Zurich, and Freie Universitaet Berlin 2002-2021.
+// ETH Zurich, and Freie Universitaet Berlin 2002-2022.
 //
 // This software is released under a three-clause BSD license:
 //  * Redistributions of source code must retain the above copyright
@@ -32,6 +32,8 @@
 // $Authors: Oliver Alka, Lukas Zimmermann $
 // --------------------------------------------------------------------------
 
+#include <boost/foreach.hpp> // must be first, otherwise Q_FOREACH macro will wreak havoc
+
 #include <OpenMS/ANALYSIS/ID/SiriusAdapterAlgorithm.h>
 
 #include <OpenMS/CONCEPT/Constants.h>
@@ -47,7 +49,7 @@
 #include <QDirIterator>
 #include <QString>
 #include <QtCore/QProcess>
-#include <fstream>
+#include <sstream>
 
 namespace OpenMS
 {
