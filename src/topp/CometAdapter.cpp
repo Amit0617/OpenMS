@@ -47,6 +47,7 @@
 #include <OpenMS/CHEMISTRY/ResidueModification.h>
 #include <OpenMS/SYSTEM/File.h>
 
+#include <cstddef>
 #include <fstream>
 
 #include <QStringList>
@@ -283,6 +284,8 @@ protected:
     }
 
     return modifications;
+     // sort modifications
+    std::sort(modifications.begin(), modifications.end());
   }
 
   ExitCodes createParamFile_(ostream& os, const String& comet_version)
@@ -339,10 +342,6 @@ protected:
     //     e.g. 79.966331 STY 0 3 -1 0 0 97.976896
     vector<String> variable_modifications_names = getStringList_("variable_modifications");
     const vector<const ResidueModification*> variable_modifications = getModifications_(variable_modifications_names);
-    if (variable_modifications.size() > 9)
-    {
-      throw OpenMS::Exception::IllegalArgument(__FILE__, __LINE__, OPENMS_PRETTY_FUNCTION, "Error: Comet supports at most 9 variable modifications. " + String(variable_modifications.size()) + " provided.");
-    }
 
     IntList binary_modifications = getIntList_("binary_modifications");
     if (!binary_modifications.empty() && binary_modifications.size() != variable_modifications.size())
@@ -352,6 +351,11 @@ protected:
 
     int max_variable_mods_in_peptide = getIntOption_("max_variable_mods_in_peptide");
     Size var_mod_index = 0;
+
+    // Store all the terms
+    vector<double>mass_vector;
+    vector<String>residues_vector;
+    vector<Int>binary_group_vector, term_distance_vector, nc_term_vector,term_specificity_vector;
 
     // write out user specified modifications
     for (; var_mod_index < variable_modifications.size(); ++var_mod_index)
@@ -367,8 +371,6 @@ protected:
         binary_group = binary_modifications[var_mod_index];
       }
 
-      //TODO support mod-specific limit (default for now is the overall max per peptide)
-      int max_current_mod_per_peptide = max_variable_mods_in_peptide;
       //TODO support term-distances?
       int term_distance = -1;
       int nc_term = 0;
@@ -415,18 +417,79 @@ protected:
         nc_term = 1;
       }
 
+      mass_vector.push_back(mass);
+      residues_vector.push_back(residues);
+      binary_group_vector.push_back(binary_group);
+      term_distance_vector.push_back(term_distance);
+      nc_term_vector.push_back(nc_term);
+      term_specificity_vector.push_back(mod->getTermSpecificity());
+
+    }
+
+    // concatenate residues
+    vector<string>residues_concat(var_mod_index);
+    int k = 0;
+    for (Size i = 0; i < var_mod_index; i++)
+    {
+      residues_concat[k] += residues_vector[i];
+
+      for (Size j = i+1; j <= var_mod_index; j++)
+      {
+        if (mass_vector[i] == mass_vector[j] && mass_vector[i] != 0 && term_specificity_vector[i] == term_specificity_vector[j])
+        {
+          residues_concat[k] += residues_vector[j];
+          // emptying so that don't get traced again in future loop
+          mass_vector[j] = 0;
+        }
+      }
+      k++;
+    }
+
+    // erase all those corresponding index elements which were zeroed in mass_vector in the vectors
+    for (Size i = 0; i <= var_mod_index; i++)
+    {
+      if ( mass_vector[i] == 0 )
+      {
+        residues_concat[i] = "0";
+        term_specificity_vector[i] = -1;
+        binary_group_vector[i] = -1;
+        term_distance_vector[i] = -9;  //just for identification
+        nc_term_vector[i] = -1;
+      }
+    }
+        mass_vector.erase(remove(mass_vector.begin(), mass_vector.end(), 0), mass_vector.end());
+        residues_concat.erase(remove(residues_concat.begin(), residues_concat.end(), "0"), residues_concat.end());
+        term_specificity_vector.erase(remove(term_specificity_vector.begin(), term_specificity_vector.end(), -1), term_specificity_vector.end());
+        binary_group_vector.erase(remove(binary_group_vector.begin(), binary_group_vector.end(), -1), binary_group_vector.end());
+        term_distance_vector.erase(remove(term_distance_vector.begin(), term_distance_vector.end(), -9), term_distance_vector.end());
+        nc_term_vector.erase(remove(nc_term_vector.begin(), nc_term_vector.end(), -1), nc_term_vector.end());
+
+    for (Size i = 0; i < mass_vector.size(); i++)
+    {
       //TODO support required variable mods
       bool required = false;
 
-      os << "variable_mod0" << var_mod_index+1 << " = " 
-         << mass << " " << residues << " " 
-         << binary_group << " " 
-         << max_current_mod_per_peptide << " " 
-         << term_distance << " " 
-         << nc_term << " " 
-         << required << " " 
+      //TODO support mod-specific limit (default for now is the overall max per peptide)
+      int max_current_mod_per_peptide = max_variable_mods_in_peptide;
+
+      os << "variable_mod0" << i+1 << " = "
+         << mass_vector[i] << " " << residues_concat[i] << " "
+         << binary_group_vector[i] << " "
+         << max_current_mod_per_peptide << " "
+         << term_distance_vector[i] << " "
+         << nc_term_vector[i] << " "
+         << required << " "
          << "0.0" // TODO: add neutral losses (from Residue or user defined?)
          << "\n";
+    }
+
+    // update var_mod_index
+    var_mod_index = mass_vector.size();
+
+    // Check number of mods after merging residues
+    if (var_mod_index > 9)
+    {
+      throw OpenMS::Exception::IllegalArgument(__FILE__, __LINE__, OPENMS_PRETTY_FUNCTION, "Error: Comet supports at most 9 variable modifications. " + String(var_mod_index) + " provided.");
     }
 
     // fill remaining modification slots (if any) in Comet with "no modification"
